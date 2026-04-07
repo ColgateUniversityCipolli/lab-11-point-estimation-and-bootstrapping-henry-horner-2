@@ -121,17 +121,29 @@ for (i in 1:sim){
     sample_v1[i] = var(distP)
     sample_v[i] = mean((distP - mean(distP))^2)
 }
-bias = mean(sample_v1) - true
-variance  = var(sample_v1)
-precision = 1 / variance
-mse = bias^2 + variance
+bias1 = round(mean(sample_v1) - true, 4)
+variance1  = round(var(sample_v1), 4)
+precision1 = round(1 / variance1, 4)
+mse1 = round(bias1^2 + variance1, 4)
+
+bias = round(mean(sample_v) - true, 4)
+variance  = round(var(sample_v), 4)
+precision = round(1 / variance, 4)
+mse = round(bias^2 + variance, 4)
+
 dfP = tibble(
 Distribution = "Poisson",
+    BiasN_1 = bias1,
+    VarianceN_1 = variance1,
+    PrecisionN_1 = precision1,
+    MSEN_1 = mse1,
     Bias = bias,
     Variance = variance,
     Precision = precision,
     MSE = mse
 )
+valuesP = sample_v
+valuesP1 = sample_v1
 
 
 # Binomial n = 50, p = (5 - root21)/10
@@ -142,17 +154,30 @@ for (i in 1:sim){
     sample_v1[i] = var(distB)
     sample_v[i] = mean((distP - mean(distP))^2)
 }
-bias = mean(sample_v1) - true
-variance  = var(sample_v1)
-precision = 1 / variance
-mse = bias^2 + variance
+bias1 = round(mean(sample_v1) - true, 4)
+variance1  = round(var(sample_v1), 4)
+precision1 = round(1 / variance1, 4)
+mse1 = round(bias1^2 + variance1, 4)
+
+bias = round(mean(sample_v) - true, 4)
+variance  = round(var(sample_v), 4)
+precision = round(1 / variance, 4)
+mse = round(bias^2 + variance, 4)
+
 dfB = tibble(
 Distribution = "Binomial",
+    BiasN_1 = bias1,
+    VarianceN_1 = variance1,
+    PrecisionN_1 = precision1,
+    MSEN_1 = mse1,
     Bias = bias,
     Variance = variance,
     Precision = precision,
     MSE = mse
 )
+valuesB = sample_v
+valuesB1 = sample_v1
+
 
 # Normal mu = 0, sigma = root2
 mu = 0
@@ -162,17 +187,30 @@ for (i in 1:sim){
     sample_v1[i] = var(distN)
     sample_v[i] = mean((distP - mean(distP))^2)
 }
-bias = mean(sample_v1) - true
-variance  = var(sample_v1)
-precision = 1 / variance
-mse = bias^2 + variance
+bias1 = round(mean(sample_v1) - true, 4)
+variance1  = round(var(sample_v1), 4)
+precision1 = round(1 / variance1, 4)
+mse1 = round(bias1^2 + variance1, 4)
+
+bias = round(mean(sample_v) - true, 4)
+variance  = round(var(sample_v), 4)
+precision = round(1 / variance, 4)
+mse = round(bias^2 + variance, 4)
+
 dfN = tibble(
 Distribution = "Normal",
+    BiasN_1 = bias1,
+    VarianceN_1 = variance1,
+    PrecisionN_1 = precision1,
+    MSEN_1 = mse1,
     Bias = bias,
     Variance = variance,
     Precision = precision,
     MSE = mse
 )
+valuesN = sample_v
+valuesN1 = sample_v1
+
 
 # Exponential lambda = 1/root2
 lambda = 1/(2^(1/2))
@@ -181,16 +219,53 @@ for (i in 1:sim){
     sample_v1[i] = var(distE)
     sample_v[i] = mean((distP - mean(distP))^2)
 }
-bias = mean(sample_v1) - true
-variance  = var(sample_v1)
-precision = 1 / variance
-mse = bias^2 + variance
+
+bias1 = round(mean(sample_v1) - true, 4)
+variance1  = round(var(sample_v1), 4)
+precision1 = round(1 / variance1, 4)
+mse1 = round(bias1^2 + variance1, 4)
+
+bias = round(mean(sample_v) - true, 4)
+variance  = round(var(sample_v), 4)
+precision = round(1 / variance, 4)
+mse = round(bias^2 + variance, 4)
+
 dfE = tibble(
 Distribution = "Exponential",
+    BiasN_1 = bias1,
+    VarianceN_1 = variance1,
+    PrecisionN_1 = precision1,
+    MSEN_1 = mse1,
     Bias = bias,
     Variance = variance,
     Precision = precision,
     MSE = mse
+)
+valuesE = sample_v
+valuesE1 = sample_v1
+```
+
+```{r}
+#| echo: false
+# Plotting
+table = bind_rows(dfP, dfB, dfN, dfE) |>
+    pivot_longer(
+            cols = -Distribution,
+            names_to = c("Metric", "EstimatorFlag"),
+            names_sep = "_N",  # splits Bias1 vs Bias etc.
+            values_to = "Value") |>
+    mutate(
+            Estimator = ifelse(!is.na(EstimatorFlag), "S_{n-1}²", "S_n²")) |>
+    select(-EstimatorFlag)
+
+table |>
+  pivot_wider(names_from = Metric, values_from = Value) |>
+  knitr::kable(caption = "Simulation Summary of Variance Estimators")
+
+plot = tibble(
+    Estimate = c(valuesP1, valuesP, valuesB1, valuesB, valuesN1, valuesN, valuesE1, valuesE),
+    Estimator = rep(c("S_{n-1}²", "S_n²"), times = 4, each = 1000),
+    Distribution = rep(c("Poisson", "Binomial", "Normal", "Exponential"), each = 1000 * 2)
 )
 ```
 
