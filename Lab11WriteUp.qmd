@@ -105,6 +105,95 @@ Create a plot or combination of plots (using patchwork) to show the results acro
 \textrm{Mean Square Error} &= \textrm{Bias}^2 + \textrm{Variance of Estimates}.
 \end{align*}
 
+**Solution:**
+```{r}
+set.seed(7272)
+n = 20
+sim = 1000
+sample_v1 = numeric(sim)
+sample_v = numeric(sim)
+true = 2
+
+# Poisson lambda = 2
+lambda = 2
+for (i in 1:sim){
+    distP = rpois(n, lambda)
+    sample_v1[i] = var(distP)
+    sample_v[i] = mean((distP - mean(distP))^2)
+}
+bias = mean(sample_v1) - true
+variance  = var(sample_v1)
+precision = 1 / variance
+mse = bias^2 + variance
+dfP = tibble(
+Distribution = "Poisson",
+    Bias = bias,
+    Variance = variance,
+    Precision = precision,
+    MSE = mse
+)
+
+
+# Binomial n = 50, p = (5 - root21)/10
+B_n = 50
+p = (5 - 21^(1/2))/10
+for (i in 1:sim){
+    distB = rbinom(n, B_n, p)
+    sample_v1[i] = var(distB)
+    sample_v[i] = mean((distP - mean(distP))^2)
+}
+bias = mean(sample_v1) - true
+variance  = var(sample_v1)
+precision = 1 / variance
+mse = bias^2 + variance
+dfB = tibble(
+Distribution = "Binomial",
+    Bias = bias,
+    Variance = variance,
+    Precision = precision,
+    MSE = mse
+)
+
+# Normal mu = 0, sigma = root2
+mu = 0
+sigma = 2^(1/2)
+for (i in 1:sim){
+    distN = rnorm(n, mu, sigma)
+    sample_v1[i] = var(distN)
+    sample_v[i] = mean((distP - mean(distP))^2)
+}
+bias = mean(sample_v1) - true
+variance  = var(sample_v1)
+precision = 1 / variance
+mse = bias^2 + variance
+dfN = tibble(
+Distribution = "Normal",
+    Bias = bias,
+    Variance = variance,
+    Precision = precision,
+    MSE = mse
+)
+
+# Exponential lambda = 1/root2
+lambda = 1/(2^(1/2))
+for (i in 1:sim){
+    distE = rexp(n, lambda)
+    sample_v1[i] = var(distE)
+    sample_v[i] = mean((distP - mean(distP))^2)
+}
+bias = mean(sample_v1) - true
+variance  = var(sample_v1)
+precision = 1 / variance
+mse = bias^2 + variance
+dfE = tibble(
+Distribution = "Exponential",
+    Bias = bias,
+    Variance = variance,
+    Precision = precision,
+    MSE = mse
+)
+```
+
 ## Simulation over various sample sizes
 Consider the effect of the sample size have on these results. Provide a graphical and numerical summary of what happens as $n$ increases -- say $n=20$, $n=50$, $n=100$, and $n=500$. Does the result in your initial simulation hold across samples? Or, do things change as the sample size changes? Ensure to set your randomization seed.
  
