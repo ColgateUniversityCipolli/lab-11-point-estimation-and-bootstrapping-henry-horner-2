@@ -107,6 +107,7 @@ Create a plot or combination of plots (using patchwork) to show the results acro
 
 **Solution:**
 ```{r}
+#| echo: false
 set.seed(7272)
 n = 20
 sim = 1000
@@ -152,7 +153,7 @@ p = (5 - 21^(1/2))/10
 for (i in 1:sim){
     distB = rbinom(n, B_n, p)
     sample_v1[i] = var(distB)
-    sample_v[i] = mean((distP - mean(distP))^2)
+    sample_v[i] = mean((distB - mean(distB))^2)
 }
 bias1 = round(mean(sample_v1) - true, 4)
 variance1  = round(var(sample_v1), 4)
@@ -185,7 +186,7 @@ sigma = 2^(1/2)
 for (i in 1:sim){
     distN = rnorm(n, mu, sigma)
     sample_v1[i] = var(distN)
-    sample_v[i] = mean((distP - mean(distP))^2)
+    sample_v[i] = mean((distN - mean(distN))^2)
 }
 bias1 = round(mean(sample_v1) - true, 4)
 variance1  = round(var(sample_v1), 4)
@@ -217,7 +218,7 @@ lambda = 1/(2^(1/2))
 for (i in 1:sim){
     distE = rexp(n, lambda)
     sample_v1[i] = var(distE)
-    sample_v[i] = mean((distP - mean(distP))^2)
+    sample_v[i] = mean((distE - mean(distE))^2)
 }
 
 bias1 = round(mean(sample_v1) - true, 4)
@@ -249,29 +250,112 @@ valuesE1 = sample_v1
 #| echo: false
 # Plotting
 table = bind_rows(dfP, dfB, dfN, dfE) |>
-    pivot_longer(
-            cols = -Distribution,
-            names_to = c("Metric", "EstimatorFlag"),
-            names_sep = "_N",  # splits Bias1 vs Bias etc.
-            values_to = "Value") |>
-    mutate(
-            Estimator = ifelse(!is.na(EstimatorFlag), "S_{n-1}²", "S_n²")) |>
-    select(-EstimatorFlag)
-
+          pivot_longer(
+                cols = -Distribution,
+                names_to = c("Metric", "EstimatorFlag"),
+                names_sep = "N",  # splits Bias1 vs Bias etc.
+                values_to = "Value") |>
+          mutate(
+                Estimator = ifelse(!is.na(EstimatorFlag), "{n-1}²", "n²")) |>
+          select(-EstimatorFlag)
 table |>
-  pivot_wider(names_from = Metric, values_from = Value) |>
-  knitr::kable(caption = "Simulation Summary of Variance Estimators")
+        pivot_wider(names_from = Metric, values_from = Value) |>
+        knitr::kable(caption = "Simulation Summary of Variance Estimators")
 
 plot = tibble(
-    Estimate = c(valuesP1, valuesP, valuesB1, valuesB, valuesN1, valuesN, valuesE1, valuesE),
-    Estimator = rep(c("S_{n-1}²", "S_n²"), times = 4, each = 1000),
-    Distribution = rep(c("Poisson", "Binomial", "Normal", "Exponential"), each = 1000 * 2)
+          Estimate = c(valuesP1, valuesP, valuesB1, valuesB, valuesN1, valuesN, valuesE1, valuesE),
+          Estimator = rep(c("{n-1}²", "n²"), times = 4, each = 1000),
+          Distribution = rep(c("Poisson", "Binomial", "Normal", "Exponential"), each = 1000 * 2)
 )
+ggplot(plot, aes(x = Estimate, fill = Estimator)) +
+        geom_density(alpha = 0.5) +
+        geom_vline(xintercept = 2, linetype = "dashed", color = "black") +
+        facet_wrap(~Distribution, scales = "free") +
+        labs(
+            title = "Comparison of Variance Estimators",
+            subtitle = "True Variance = 2",
+            x = "Estimated Variance",
+            y = "Density",
+            fill = "Estimator") +
+        theme_minimal()
 ```
 
 ## Simulation over various sample sizes
 Consider the effect of the sample size have on these results. Provide a graphical and numerical summary of what happens as $n$ increases -- say $n=20$, $n=50$, $n=100$, and $n=500$. Does the result in your initial simulation hold across samples? Or, do things change as the sample size changes? Ensure to set your randomization seed.
- 
+
+**Solution:**
+```{r}
+#| echo: false
+set.seed(7272)
+
+sample_sizes = c(20, 50, 100, 500)
+sim = 1000
+true = 2
+
+results = list()
+
+for (n in sample_sizes) {
+  
+  # helper function
+  compute_stats = function(x) {
+    v_n1 = var(x)
+    v_n = mean((x - mean(x))^2)
+    return(c(v_n1, v_n))
+  }
+  
+  run_sim = function(generator) {
+    out = replicate(sim, {
+      x = generator(n)
+      compute_stats(x)
+    })
+    t(out)
+  }
+  
+  # Distributions
+  pois = run_sim(function(n) rpois(n, 2))
+  bino = run_sim(function(n) rbinom(n, 50, (5 - sqrt(21))/10))
+  norm = run_sim(function(n) rnorm(n, 0, sqrt(2)))
+  expo = run_sim(function(n) rexp(n, 1/sqrt(2)))
+  
+  dists = list(Poisson = pois, Binomial = bino, Normal = norm, Exponential = expo)
+  
+  for (name in names(dists)) {
+    vals = dists[[name]]
+    
+    v_n1 = vals[,1]
+    v_n = vals[,2]
+    
+    df = tibble(
+      n = n,
+      Distribution = name,
+      Estimator = c("S_{n-1}²", "S_n²"),
+      Bias = c(mean(v_n1) - true, mean(v_n) - true),
+      Variance = c(var(v_n1), var(v_n))
+    ) |>
+      mutate(
+        Precision = 1 / Variance,
+        MSE = Bias^2 + Variance
+      )
+    
+    results[[length(results) + 1]] = df
+  }
+}
+
+table = bind_rows(results)
+```
+```{r}
+#| echo: false
+ggplot(table, aes(x = n, y = MSE, color = Estimator)) +
+      geom_line() +
+        geom_point() +
+      facet_wrap(~Distribution) +
+      labs(title = "MSE vs Sample Size") +
+      theme_minimal()
+
+table |>
+  arrange(Distribution, n, Estimator) |>
+  knitr::kable(digits = 4, caption = "Simulation Results Across Sample Sizes")
+```
 ## Simulation
 You have written code to draw a random sample of various sizes from each distribution, and to calculate and store the calculated estimates. Rework your code to produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do you have a guess about their distribution? Ensure to set your randomization seed. 
 
