@@ -296,52 +296,53 @@ results = list()
 
 for (n in sample_sizes) {
   
-  # helper function
-  compute_stats = function(x) {
+  compute = function(x) {
     v_n1 = var(x)
     v_n = mean((x - mean(x))^2)
     return(c(v_n1, v_n))
   }
   
-  run_sim = function(generator) {
+  run = function(generator) {
     out = replicate(sim, {
       x = generator(n)
-      compute_stats(x)
+      compute(x)
     })
     t(out)
   }
   
-  # Distributions
-  pois = run_sim(function(n) rpois(n, 2))
-  bino = run_sim(function(n) rbinom(n, 50, (5 - sqrt(21))/10))
-  norm = run_sim(function(n) rnorm(n, 0, sqrt(2)))
-  expo = run_sim(function(n) rexp(n, 1/sqrt(2)))
+  pois = run(function(n) rpois(n, 2))
+  bino = run(function(n) rbinom(n, 50, (5 - sqrt(21))/10))
+  norm = run(function(n) rnorm(n, 0, sqrt(2)))
+  expo = run(function(n) rexp(n, 1/sqrt(2)))
   
   dists = list(Poisson = pois, Binomial = bino, Normal = norm, Exponential = expo)
   
   for (name in names(dists)) {
-    vals = dists[[name]]
+      vals = dists[[name]]
     
-    v_n1 = vals[,1]
-    v_n = vals[,2]
+      v_n1 = vals[,1]
+      v_n = vals[,2]
     
-    df = tibble(
-      n = n,
-      Distribution = name,
-      Estimator = c("S_{n-1}²", "S_n²"),
-      Bias = c(mean(v_n1) - true, mean(v_n) - true),
-      Variance = c(var(v_n1), var(v_n))
-    ) |>
-      mutate(
-        Precision = 1 / Variance,
-        MSE = Bias^2 + Variance
-      )
+      df = tibble(
+              n = n,
+              Distribution = name,
+              Estimator = c("{n-1}²", "n²"),
+              Bias = c(mean(v_n1) - true, mean(v_n) - true),
+              Variance = c(var(v_n1), var(v_n))) |>
+            mutate(Precision = 1 / Variance,
+                  MSE = Bias^2 + Variance)
     
-    results[[length(results) + 1]] = df
+      results[[length(results) + 1]] = df
   }
 }
 
 table = bind_rows(results)
+wide = table |>
+  pivot_wider(
+    names_from = Estimator,
+    values_from = c(Bias, Variance, Precision, MSE)
+  )
+
 ```
 ```{r}
 #| echo: false
@@ -352,12 +353,80 @@ ggplot(table, aes(x = n, y = MSE, color = Estimator)) +
       labs(title = "MSE vs Sample Size") +
       theme_minimal()
 
-table |>
-  arrange(Distribution, n, Estimator) |>
-  knitr::kable(digits = 4, caption = "Simulation Results Across Sample Sizes")
+wide |>
+  knitr::kable(
+    caption = "Simulation Results Across Sample Sizes",
+    digits = 4,
+    col.names = c(
+      "n", "Distribution",
+      "Bias (n-1)", "Bias (n)",
+      "Var (n-1)", "Var (n)",
+      "Precision (n-1)", "Precision (n)",
+      "MSE (n-1)", "MSE (n)"
+    )
+  )
 ```
+
 ## Simulation
 You have written code to draw a random sample of various sizes from each distribution, and to calculate and store the calculated estimates. Rework your code to produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do you have a guess about their distribution? Ensure to set your randomization seed. 
+
+**Solutution:**
+As the sampling size increases, the distributions appear to show signs of approaching the Normal distribution, and while they are small sample sizes they have a right skew. This could resemble a log-normal distribution since at low sample sizes it shows large right skews. Since the variances of $(n-1)^2$ and $n^2$ are so close to each other, it is incredibly hard to distinguish them on the grpahs.
+```{r}
+#| echo: false
+set.seed(7272)
+
+plot2 = list()
+
+compute = function(x) {
+  v_n1 = var(x)
+  v_n = mean((x - mean(x))^2)
+  return(c(v_n1, v_n))
+}
+
+run = function(generator, n) {
+  out = replicate(sim, {
+    x = generator(n)
+    compute(x)
+  })
+  t(out)
+}
+
+for (n in sample_sizes){
+  
+      pois = run(function(n) rpois(n, 2), n)
+      bino = run(function(n) rbinom(n, 50, (5 - sqrt(21))/10), n)
+      norm = run(function(n) rnorm(n, 0, sqrt(2)), n)
+      expo = run(function(n) rexp(n, 1/sqrt(2)), n)
+  
+      dists = list(Poisson = pois, Binomial = bino, Normal = norm, Exponential = expo)
+  
+      for (name in names(dists)) {
+        vals = dists[[name]]
+    
+        df = tibble(Estimate = c(vals[,1], vals[,2]),
+                  Estimator = rep(c("{n-1}²", "n²"), each = sim),
+                  Distribution = name,
+                  n = n)
+    
+        plot2[[length(plot2) + 1]] = df
+  }
+}
+
+plotDF = bind_rows(plot2)
+plotDF = plotDF |>
+        mutate(Distribution = ifelse(Distribution == "Exponential", "Expo.", Distribution))
+ggplot(plotDF, aes(x = Estimate, fill = Estimator)) +
+        geom_density(alpha = 0.5) +
+        facet_grid(Distribution ~ n, scales = "free") +
+        geom_vline(xintercept = 2, linetype = "dashed") +
+        labs(title = "Density of Variance Estimators",
+            subtitle = "Comparison of s²_{n-1} and s²_n across sample sizes",
+            x = "Estimated Variance",
+            y = "Density",
+            fill = "Estimator") +
+        theme_minimal()
+```
 
 ## Bootstrap
 Now, take *one* sample from each distribution. Instead of drawing a random sample at each iteration, sample *with replacement* from the one sample. Produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do we get roughly the same information as we do in the full simulation? Try this over several seeds -- what do you notice? Ensure to set your randomization seed.
