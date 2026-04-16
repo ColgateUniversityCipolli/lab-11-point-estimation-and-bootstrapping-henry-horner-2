@@ -421,7 +421,6 @@ ggplot(plotDF, aes(x = Estimate, fill = Estimator)) +
         facet_grid(Distribution ~ n, scales = "free") +
         geom_vline(xintercept = 2, linetype = "dashed") +
         labs(title = "Density of Variance Estimators",
-            subtitle = "Comparison of s²_{n-1} and s²_n across sample sizes",
             x = "Estimated Variance",
             y = "Density",
             fill = "Estimator") +
@@ -430,6 +429,69 @@ ggplot(plotDF, aes(x = Estimate, fill = Estimator)) +
 
 ## Bootstrap
 Now, take *one* sample from each distribution. Instead of drawing a random sample at each iteration, sample *with replacement* from the one sample. Produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do we get roughly the same information as we do in the full simulation? Try this over several seeds -- what do you notice? Ensure to set your randomization seed.
+
+**Solution:***
+For the most part it is close enough to see similarities between the bootstrapping and the full simulation, showing similar curves. It still shows a general right skew, however across different seeds the distributions can get extremely incorrect and far off from where the full simulation shows.
+```{r}
+#| echo: false
+set.seed(7272)
+
+n = 20
+B = 1000
+
+bootstrap_run = function(x) {
+      compute = function(xb) {
+            v_n1 = var(xb)
+            v_n = mean((xb - mean(xb))^2)
+            c(v_n1, v_n)
+      }
+  
+      out = replicate(B, {
+            xb = sample(x, size = length(x), replace = TRUE)
+            compute(xb)})
+  
+      t(out)
+}
+
+p1 = rpois(n, 2)
+b1 = rbinom(n, 50, (5 - sqrt(21))/10)
+n1 = rnorm(n, 0, sqrt(2))
+e1 = rexp(n, 1/sqrt(2))
+
+pois = bootstrap_run(p1)
+bino = bootstrap_run(b1)
+norm = bootstrap_run(n1)
+expo = bootstrap_run(e1)
+
+plotDF = bind_rows(
+  tibble(Estimate = c(pois[,1], pois[,2]),
+         Estimator = rep(c("(n-1)", "n"), each = B),
+         Distribution = "Poisson"),
+  
+  tibble(Estimate = c(bino[,1], bino[,2]),
+         Estimator = rep(c("(n-1)", "n"), each = B),
+         Distribution = "Binomial"),
+  
+  tibble(Estimate = c(norm[,1], norm[,2]),
+         Estimator = rep(c("(n-1)", "n"), each = B),
+         Distribution = "Normal"),
+  
+  tibble(Estimate = c(expo[,1], expo[,2]),
+         Estimator = rep(c("(n-1)", "n"), each = B),
+         Distribution = "Exponential")
+)
+
+ggplot(plotDF, aes(x = Estimate, fill = Estimator)) +
+      geom_density(alpha = 0.5) +
+      facet_wrap(~Distribution, scales = "free") +
+      geom_vline(xintercept = 2, linetype = "dashed") +
+      labs(
+          title = "Bootstrap Sampling Distributions",
+          x = "Estimated Variance",
+          y = "Density",
+          fill = "Estimator") +
+      theme_minimal()
+```
 
 
 # Executive Summary
